@@ -1,0 +1,8 @@
+二. 拦截器栈
+1. 多个拦截器同时生效时,组成了拦截器栈
+2. 顺序:栈：先进后出.
+3. 执行顺序和在 springmvc.xml 中配置顺序有关
+4. 设置先配置拦截器A 在配置拦截器B 执行顺序为
+preHandle(A) --> preHandle(B) --> 控制器方法--> postHandle(B)
+--> postHanle(A) --> JSP --> afterCompletion(B) --> afterCompletion(A)
+    理解为A包B，B包Controller，三层的球体，再一个箭头（代表调用）射穿这个球体。

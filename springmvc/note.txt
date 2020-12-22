@@ -1,0 +1,7 @@
+参考 https://docs.spring.io/spring/docs/5.2.3.RELEASE/spring-framework-reference/web.html#spring-web 中
+DispatcherServlet的两种配置方法：
+1、web.xml
+2、代码：实现  WebApplicationInitializer 接口。
+
+
+

@@ -1,0 +1,25 @@
+导入 eclipse 的 dynamic web project，然后进行项目设置：
+Project节的 Project compile output值为： 项目根目录的 out 子目录（项目整体最终输出路径）。
+Modulers节的springmvc01 根属性（即springmvc01这个module的属性）的 Paths页，选择 Use module compile output path，值为 build\classes 全路径；
+Modulers节的 springmvc01 根属性（即springmvc01这个module的属性）的Dependencies 页，需要设置 1.8 JDK（Compile）、tomcat依赖（Compile）、lib（对应 WebContent/WEB-INF/lib 目录，也是Compile类型）
+Modulers节的 Web 子属性Deployment Descriptors的Path为 WebContent/WEB-INF/web.xml 全路径、Web Resource Directories为 Web Resource Directory 为  WebContent 目录全路径、Path Relative to Deployment Root值为/、Source Roots为 src 目录全路径（和Facets节配置一样）
+Libraries 节需要添加 WebContent/WEB-INF/lib 目录。
+Facets节的Deployment Descriptors的path为 WebContent/WEB-INF/web.xml 全路径、Web Resources Directories的Web Resource Directory 为  WebContent 目录全路径、Path Relative to Deployment Root值为/、Source Roots 值为 项目根目录（src的上一级目录）
+Artifacts节，Output directory 值为 out/artifacts/springmvc01_war_exploded全路径，Type为 Web Application Exploded，Outpout Layout的<output root>为 WEB-INF。
+
+DispatcherServlet 是一个Servlet，在tomcat启动时，会执行它的生命周期方法（init/service/destroy）。
+DispatcherServlet.init -> FrameworkServlet.initServletBean -> FrameworkServlet.initWebApplicationContext 设置了父子容器。
+Spring容器是父容器，Spring MVC是子容器。Spring MVC的 Controller Bean 可以引用Spring容器里的 Service Bean。
+反之不行。
+FrameworkServlet.createWebApplicationContext
+DispatcherServlet.initStrategies 方法初始化了SpringMVC所有可能用到的组件。
+
+SpringMVC 调用过程：
+DispatcherServlet -> HandlerMapping -> HandlerAdapter(用来封装/调用Contrller) -> Handler（业务定义的 Controller对象） -> ViewResovler 。
+DispatcherServlet.doDispatch 获取 HandlerExecutionChain（即 HandlerMapping）
+springmvc.xml 里配置的 SimpleUrlHandlerMapping，它的 registerHandlers 方法注册业务定义的Controller对象作为 Handler。
+AbstractUrlHandlerMapping.lookupHandler 查找请求url匹配的注册的Handler（controller）。
+
+springmvc.xml 里配置的 SimpleControllerHandlerAdapter ，handle() 方法超级简单：将handler转换为Controller，调用controller的 handleRequest 方法。
+
+

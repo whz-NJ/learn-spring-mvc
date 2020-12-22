@@ -1,0 +1,128 @@
+create table users (
+id int(10) primary key auto_increment,
+username varchar(20),
+password varchar(20),
+photo varchar(50)
+);
+create table files (
+id int(10) primary key auto_increment,
+name varchar(20),
+count int(10)
+);
+insert into files values(default, 'a.png', 0);
+insert into files values(default, 'b.png', 0);
+
+UsersController.register() 方法调用： req.getSession().setAttribute("user", users);
+在session作用域传了当前登录用户信息，然后在 FilesController.download() 方法里调用
+req.getSession().getAttribute("user") 获取当前登录的用户信息，然后传给 FileServiceImpl#updCount()
+实现在日志记录哪个用户下载了哪个文件的功能。
+
+<!-- 将出现更新覆盖情况，REPEATABLE_READ 是锁住待更新的行，SERIALIZABLE 锁整个表 -->
+Repeatable-Read及Read-Committed区别
+https://blog.csdn.net/qq_34457768/article/details/80066248
+RC模式下的测试
+窗口1
+>show variables like 'tx_isolation';
++---------------+----------------+
+| Variable_name | Value          |
++---------------+----------------+
+| tx_isolation  | READ-COMMITTED |
++---------------+----------------+
+1 row in set (0.01 sec)
+>begin;  --开启事务
+>select *from test;  --查看数据
++----+-------+------+
+| id | name  | memo |
++----+-------+------+
+|  1 | name1 | aaaa |
+|  2 | name2 | aaaa |
+|  3 | name3 | aaaa |
+|  4 | name4 | aaaa |
+|  5 | name5 | aaaa |
++----+-------+------+
+5 rows in set (0.00 sec)
+
+窗口2
+begin；  --开启事务
+>update test set name='aaaaa' where id=2;  --修改一条记录
+Query OK, 1 row affected (0.06 sec)
+Rows matched: 1  Changed: 1  Warnings: 0
+>commit;  --提交事务
+Query OK, 0 rows affected (0.01 sec)
+
+窗口1
+>select *from test;   -- 查看窗口1中的数据，就会发现原来窗口的数据发生了变化，这是不可重复读的一个典型例子。、
+                      -- 虽然窗口1的事务没有结束，还是可以看到窗口2事务的修改结果。
++----+-------+------+
+| id | name  | memo |
++----+-------+------+
+|  1 | name1 | aaaa |
+|  2 | aaaaa | aaaa |
+|  3 | name3 | aaaa |
+|  4 | name4 | aaaa |
+|  5 | name5 | aaaa |
++----+-------+------+
+5 rows in set (0.00 sec)
+
+RR模式下的测试
+再来看看RR这个隔离级别，其实有了上面的测试，就相对有底了。这是MySQL默认的隔离级别，会出现幻读的情况。
+窗口1
+首先修改隔离级别从RC到RR
+>set global transaction isolation level repeatable read;
+Query OK, 0 rows affected (0.00 sec)
+?查看事务隔离级别。
+>show variables like 'tx_isolation';
++---------------+-----------------+
+| Variable_name | Value           |
++---------------+-----------------+
+| tx_isolation  | REPEATABLE-READ |
++---------------+-----------------+
+1 row in set (0.00 sec)
+>begin;   --开启事务
+>select *from test;   --查看表test的数据。
++----+-------+------+
+| id | name  | memo |
++----+-------+------+
+|  1 | name1 | aaaa |
+|  2 | aaaaa | aaaa |
+|  3 | name3 | aaaa |
+|  4 | name4 | aaaa |
+|  5 | name5 | aaaa |
++----+-------+------+
+5 rows in set (0.00 sec)
+
+窗口2
+>begin;  --开启事务
+>update test set name='RR_test';  --修改表test的数据，所有记录都发生变化。
+Query OK, 5 rows affected (0.01 sec)
+Rows matched: 5  Changed: 5  Warnings: 0
+>commit;  --提交事务
+Query OK, 0 rows affected (0.00 sec)
+
+窗口1
+>select *from test;  --在RR模式下，窗口1中的事务因为还没有提交，看到的还是原来的数据。
++----+-------+------+
+| id | name  | memo |
++----+-------+------+
+|  1 | name1 | aaaa |
+|  2 | aaaaa | aaaa |
+|  3 | name3 | aaaa |
+|  4 | name4 | aaaa |
+|  5 | name5 | aaaa |
++----+-------+------+
+5 rows in set (0.00 sec)
+>commit;  --我们提交窗口1的事务
+Query OK, 0 rows affected (0.00 sec)
+>select *from test;  --再次查看数据就发生了变化，实际上窗口1中没有任何的DMl操作。
++----+---------+------+
+| id | name    | memo |
++----+---------+------+
+|  1 | RR_test | aaaa |
+|  2 | RR_test | aaaa |
+|  3 | RR_test | aaaa |
+|  4 | RR_test | aaaa |
+|  5 | RR_test | aaaa |
++----+---------+------+
+5 rows in set (0.00 sec)
+ps：隔离级别为“repeatables-read”，不是“start transaction”就开始隔离的（快照），而是事务中第一个查询被执行，才会建立快照，开始隔离。
+可以以“start transaction with consistent snapshot”开始事务，即可立即建立快照

@@ -1,0 +1,316 @@
+通过注解驱动的方式配置 Spring MVC。
+springmvc.xml里加入配置：
+	<context:component-scan base-package="com.bjsxt.controller"></context:component-scan>
+	<mvc:annotation-driven></mvc:annotation-driven>
+mvc:annotation-driven 配置实际上注册了两个组件：
+	<!-- org.springframework.web.servlet.mvc.annotation.DefaultAnnotationHandlerMapping -->
+	<!-- org.springframework.web.servlet.mvc.annotation.AnnotationMethodHandlerAdapter -->
+然后在 Controller类里用@Controller注解修饰，注册到容器，然后每个方法用 @RequestMapping 注解指定范围URL路径。
+（不用再像在 web.xml 配置SpringMVC那样，通过 springmvc.xml 里注册 SimpleUrlHandlerMapping Bean，设置 urlMap 属性方式指定访问路径了）
+DefaultAnnotationHandlerMapping 会扫描所有的 Controller。
+
+web.xml 里配置 url-pattern 为 / ，这样只要请求URL不是以 .jsp 结尾的，都会走 Dispatcher 前端控制器。
+所以如果要访问 http://localhost:8080/springmvc02_Web_exploded/js/j.js 会访问不了（dispatcherServlet不支持解析js文件）。
+为了解决这个问题，需要在 springmvc.xml 里加入如下配置：
+	<mvc:resources location="/js/" mapping="/js/**"></mvc:resources>
+	<mvc:resources location="/css/" mapping="/css/**"></mvc:resources>
+	<mvc:resources location="/images/" mapping="/images/**"></mvc:resources>、
+	类似还有 html 。
+上面配置的 ** 表示请求URL目录下的若干层子目录都能匹配。*表示只看当前目录。
+或是写为：
+    <mvc:resources location="/WEB-INF/js/" mapping="/js/**"></mvc:resources>
+
+环境搭建过程：
+1、拷贝 jar包到 WebContet/WEB-INF/lib 目录。
+2、在web.xml 中配置前端控制器DispatcherServlet
+  2.1 如果不配置<init-param> 会固定找 /WEB-INF/<servlet-name>-servlet.xml 作为SpringMVC xml配置。
+	<servlet>
+		<servlet-name>jqk</servlet-name>
+		<servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+		<init-param>
+			<param-name>contextConfigLocation</param-name>
+			<param-value>classpath:springmvc.xml</param-value>
+		</init-param>
+		<load-on-startup>1</load-on-startup>
+	</servlet>
+  <servlet-mapping>
+  <servlet-name>jqk</servlet-name>
+  <url-pattern>/</url-pattern>
+  </servlet-mapping>
+3. 在src 下新建 springmvc.xml
+3.1 引入xmlns:mvc 命名空间：
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:mvc="http://www.springframework.org/schema/mvc"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans
+        http://www.springframework.org/schema/beans/spring-beans.xsd
+        http://www.springframework.org/schema/context
+        http://www.springframework.org/schema/context/spring-context.xsd
+        http://www.springframework.org/schema/mvc
+        http://www.springframework.org/schema/mvc/spring-mvc.xsd">
+    <!-- 扫描注解 -->
+	<context:component-scan base-package="com.bjsxt.controller"></context:component-scan>
+	<!-- 注解驱动 -->
+	<!-- mvc:annotation-driven注解相当于注册了下面两个组件 -->
+	<!-- org.springframework.web.servlet.mvc.annotation.DefaultAnnotationHandlerMapping -->
+	<!-- org.springframework.web.servlet.mvc.annotation.AnnotationMethodHandlerAdapter -->
+	<mvc:annotation-driven></mvc:annotation-driven>
+	<!-- 静态资源 -->
+	<!--<mvc:resources location="/js/" mapping="/js/**"></mvc:resources>-->
+	<mvc:resources location="/WEB-INF/js/" mapping="/js/**"></mvc:resources>
+	<mvc:resources location="/css/" mapping="/css/**"></mvc:resources>
+	<mvc:resources location="/images/" mapping="/images/**"></mvc:resources>
+</beans>
+4. 编写控制器类Controller。
+
+请求参数处理：
+把内容写到方法(HandlerMethod -- Controller里的@ReqestMapping修饰的方法)参数中,SpringMVC 只要有这个内容，都会注入内容。
+基本数据类型：默认只要保证 handlerMethod 参数名称和请求中传递的参数名相同（也可以通过 @RequestParam(value="name1") 形式指定客户端发过来的参数名）
+添加 index.jsp，里面写个form表单，请求url为 demo，然后访问 http://localhost:8080/springmvc02_Web_exploded/ 即访问 index.jsp。
+然后修改 Controller：
+	@RequestMapping("demo")
+	public String demo(String name, int age){
+		System.out.println("执行demo"+name + "   " + age);
+		return "main.jsp";
+	}
+为了解决中文乱码问题，需要在 web.xml 里加入 filter：
+	<filter>
+		<filter-name>encoding</filter-name>
+		<filter-class>org.springframework.web.filter.CharacterEncodingFilter</filter-class>
+		<init-param>
+			<param-name>encoding</param-name>
+			<param-value>utf-8</param-value>
+		</init-param>
+	</filter>
+	<filter-mapping>
+		<filter-name>encoding</filter-name>
+		<url-pattern>/*</url-pattern>
+	</filter-mapping>
+请求参数为对象类型：
+客户端发来的请求参数名和对象中属性名对应(get/set 方法)
+修改 Controller：
+	@RequestMapping("demo")
+	public String demo(People people, String name, int age, HttpServletRequest req, HttpSession session){
+		System.out.println("执行demo"+people + " " + name + " " + age);
+		// req.getSession 和 session 变量相同
+		req.setAttribute("demo123", "测试");
+		return "main.jsp";
+	}
+并修改 main.jsp：
+<body>
+main.jsp <br/>
+${demo123}
+</body>
+如果返回 HTTP 错误码为 400 ，表示客户端发过来的消息，消息体和Controller方法的参数类型不匹配。
+
+@RequestParam 不仅可以解决客户端传过来的参数和代码变量名不匹配问题，也可以设置不匹配时的缺省值：
+	// 为了访问不带参数的page时不报错，可以把原子类型修改为封装类型
+	// public String page(int pageSize, int pageNo) {
+	// public String page(Integer pageSize, Integer pageNo) {
+	// 也可以通过 @RequestParam 设置缺省值
+	public String page(@RequestParam(defaultValue = "10") int pageSize, @RequestParam(defaultValue = "1")int pageNo) {
+		return "main.jsp";
+	}
+@RequestParam 还可以指定哪些参数是必须的，比如：
+	@RequestMapping("demo2")
+	public String demo2(@RequestParam(required = true) String name){
+		System.out.println("demo2");
+		return "main1.jsp";
+	}
+此时访问 http://localhost:8080/springmvc02_Web_exploded/demo2?name=123 没有问题，
+但访问 http://localhost:8080/springmvc02_Web_exploded/demo2 就报 400 错误。
+@RequestParam 的 required=true 和 defaultValue 不要一起使用，否则 required 恒不成立（即这个参数永远有值）。
+
+请求参数中包含多个同名参数的获取方式
+复选框传递的参数就是多个同名参数
+比如修改 index.jsp，加入 checkbox 配置：
+<form action="demo5" method="post">
+    <input type="text" name="name" />
+    <input type="text" name="age" />
+    <input type="checkbox" name="hover" value="学习">
+    <input type="checkbox" name="hover" value="写代码">
+    <input type="checkbox" name="hover" value="看视频">
+    <input type="checkbox" name="hover" value="看笔记">
+    <input type="submit" name="提交" />
+</form>
+并修改 Controller：
+	@RequestMapping("demo5")
+	public String demo2(String name, int age, List<String> hover){
+		System.out.println(name + " " + age + " " + hover);
+		return "main.jsp";
+	}
+此时访问 http://localhost:8080/springmvc02_Web_exploded/ ，输出参数，并勾选任意box，报500错误，无法初始化List。
+再修改Controller，将List修改为ArrayList：
+	public String demo2(String name, int age, ArrayList<String> hover){
+		System.out.println(name + " " + age + " " + hover);
+		return "main.jsp";
+	}
+发现虽然没报错，但 hover 变量值为[]。
+实际正确的代码应该是（把所有名为 hover 的参数值收集到 List 里）：
+	public String demo2(String name, int age, @RequestParam(value="hover") List<String> hover){
+		System.out.println(name + " " + age + " " + hover);
+		return "main.jsp";
+	}
+
+请求参数名为 对象.属性格式：
+修改 index.jsp ：
+<form action="demo6" method="post">
+    <input type="text" name="peo.name" />
+    <input type="text" name="peo.age" />
+    <input type="submit" name="提交" />
+</form>
+这里的参数名带 peo. 前缀，为了接收这些参数，可以定义一个类，类名随意（比如为Demo），但要有个名为peo的People类型变量。
+修改 Controller：
+    @RequestMapping("demo6")
+	public String demo6(Demo demo){
+		System.out.println(demo);
+		return "main.jsp";
+	}
+
+在请求参数中传递集合对象类型参数：
+修改 ndex.jsp ：
+<form action="demo7" method="post">
+    <input type="text" name="peo[0].name"  />
+    <input type="text"name="peo[0].age"  />
+    <input type="text" name="peo[1].name"  />
+    <input type="text"name="peo[1].age"  />
+    <input type="submit" name="提交" />
+</form>
+此时需要新增Demo2，有个List<People>类型的peo成员：
+并修改Controller：
+	@RequestMapping("demo7")
+	public String demo7(Demo2 demo){
+		System.out.println(demo);
+		return "main.jsp";
+	}
+
+restful 传值方式.
+简化jsp 中参数编写格式
+<a href="demo8/123/abc">跳转</a>
+7.3 在控制器中
+在@RequestMapping 中一定要和JSP传递的参数请求格式对应
+@RequestMapping 中的 {名称} 中名称自定义名称
+@PathVariable 获取@RequestMapping 中内容,默认按照方法参数名称去寻找.
+示例：在 index.jsp 里有如下代码：
+<a href="demo8?age=123&name=abc">跳转</a>
+在Controller里的代码：
+	@RequestMapping("demo8")
+	public String demo8(String name, int age){
+		System.out.println(name + " " + age);
+		return "main.jsp";
+	}
+这里可以把 index.jsp的代码简化为：<a href="demo8/123/abc">跳转</a>
+此时Controller代码应该修改为（注意 age1 参数前面也要有 @PathVariable 注解修饰）：
+	@RequestMapping("demo8/{age1}/{name1}")
+	public String demo8(@PathVariable(value="name1") String name, @PathVariable int age1){
+		System.out.println(name + " " + age1);
+		return "/main.jsp";
+	}
+
+四.跳转方式
+1. 默认跳转方式请求转发.
+2. 设置返回值字符串内容
+2.1 添加 redirect:资源路径 重定向
+2.2 添加 forward:资源路径 或 省略forward: 转发
+转发模式示例：修改Controller：
+	@RequestMapping("/demo9")
+	public String demo9(){
+		System.out.println("转发");
+		return "/main.jsp";
+	}
+浏览器访问： http://localhost:8080/springmvc02_Web_exploded/demo9 回车，浏览器目录没有变。
+再修改Controller的模式为转发：
+	@RequestMapping("/demo9")
+	public String demo9(){
+		System.out.println("转发");
+		return "redirect:/main.jsp";
+	}
+浏览器访问： http://localhost:8080/springmvc02_Web_exploded/demo9 回车，浏览器地址变为：
+http://localhost:8080/springmvc02_Web_exploded/main.jsp
+
+forward和redirect是什么？
+是servlet种的两种主要的跳转方式。forward又叫转发，redirect叫做重定向。
+区别：（本地效应次数）
+地址栏，数据共享，应用场景，效率，本质，次数
+两者的区别总结：
+1. 从地址栏显示来说：
+1）forword是服务器内部的重定向，服务器直接访问目标地址的 url网址，把里面的东西读取出来，但是客户端并不知道，因此用forward的话，客户端浏览器的网址是不会发生变化的。
+2）redirect是服务器根据逻辑，发送一个状态码，告诉浏览器重新去请求那个地址，所以地址栏显示的是新的地址。
+2。 从数据共享来说：
+1）由于在整个定向的过程中用的是同一个request，因此forward会将request的信息带到被重定向的jsp或者servlet中使用。即可以共享数据
+2）redirect不能共享
+3. 从运用的地方来说
+1）forword 一般用于用户登录的时候，根据角色转发到相应的模块
+2） redirect一般用于用户注销登录时返回主页面或者跳转到其他网站
+4。 从效率来说：
+1）forword效率高，而redirect效率低
+5. 从本质来说：
+forword转发是服务器上的行为，而redirect重定向是客户端的行为
+6. 从请求的次数来说：
+forword只有一次请求；而redirect有两次请求，
+再举一个浅显易懂的例子：
+转发的时候你并不知道A局有没有去联系B局，信息没有被泄露，没有丢失！！
+
+视图解析器：
+1. SpringMVC 会提供默认视图解析器.
+2. 程序员自定义视图解析器：在springmvc.xml里加入配置：
+	<bean id="viewResolver" class="org.springframework.web.servlet.view.InternalResourceViewResolver">
+		<property name="prefix" value="/"></property> <!-- 视图所在的目录 -->
+		<property name="suffix" value=".jsp"></property>  <!-- 视图后缀名 -->
+	</bean>
+这样的话，在 DemoController 中所有返回值中，都不需要前面的 / 以及后缀 .jsp 了，比如：
+	@RequestMapping("demo7")
+	public String demo7(Demo2 demo){
+		System.out.println(demo);
+		return "main";
+	}
+但如果是 forward: 或 redirect: 修饰的视图解析器走系统默认的视图解析器，不走用户配置的自定义视图解析器。
+系统默认视图解析器不会加上前缀/后缀，需要代码指定完整路径，解析器根据全路径找jsp文件，也支持非jsp请求：
+比如：
+	@RequestMapping("/demo10")
+	public String demo10(){
+		// return "demo11"; // 会通过自定义视图解析器，认为是一个jsp文件（/demo11.jsp 文件不存在）
+		return "forward:demo11";  // 此时不走自定义视图解析器，而是走系统默认视图解析器
+	}
+	@RequestMapping("/demo11")
+	public String demo11(){
+		return "main";
+	}
+
+@ResponseBody 的使用：
+在方法上添加@ResponseBody(恒不跳转)
+2.1 如果返回值满足key-value 形式(对象或map)
+2.1.1 把响应头设置为application/json;charset=utf-8
+2.1.2 把转换后的内容输出流的形式响应给客户端.
+2.2 如果返回值不满足key-value,例如返回值为String
+2.2.1 把相应头设置为text/html
+2.2.2 把方法返回值以流的形式直接输出.
+2.2.3 如果返回值包含中文,出现中文乱码
+2.2.3.1 produces 表示响应头中Content-Type 取值.
+示例：
+	//纯servlet实现给客户端返回对象json字符串
+	@RequestMapping("/demo12")
+	public void demo12(HttpServletResponse res) throws IOException {
+		PrintWriter out = res.getWriter();
+		out.print("对象的json字符串");
+		out.flush();
+		out.close();
+	}
+	@RequestMapping("/demo13")
+	@ResponseBody // 把返回值转换为json字符串，并把content-Type为application-json;charset=utf-8，并不跳转到某个静态网页
+	// 想要该注解生效，需要导入jackson的三个jar包：jackson-annotations-2.4.0 jackson-core-2.4.1 jackson-databind-2.4.1
+	// 如果方法返回的不是对象，而是一个字符串/整型等，会把content-type设置为 text/html 类型
+	public People demo13() {
+		People p = new People();
+		p.setName("zs");
+		p.setAge(23);
+		return p;
+	}
+	@RequestMapping(value = "/demo14", produces = "text/html;charset=utf-8")
+	@ResponseBody // 如果返回值为原子类型，@ResponseBody会把Content-Type设置为text/html
+	              // 由于没有指定字符集，会有中文乱码问题，可以在 @RequestMapping 中的produces指定Content-Type
+	public String demo14() {
+		return "张三";
+	}

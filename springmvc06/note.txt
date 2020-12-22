@@ -1,0 +1,42 @@
+一.自定义拦截器
+1.跟过滤器比较像的技术.
+2.发送请求时被拦截器拦截,在控制器的前后添加额外功能.
+2.1 跟AOP 区分开.AOP 在特定方法前后扩充(对ServiceImpl)
+2.2 拦截器,请求的拦截.针对点是控制器方法.(对Controller)
+3.SpringMVC 拦截器和Filter 的区别
+3.1 拦截器只能拦截控制器 Controller（因为SpringMVC的入口是DispatcherServlet，在web.xml里DispatcherServlet处理的url-pattern为/：
+                                 除了jsp都拦截，并在springmvc.xml里配置图片/网页等等静态资源放行，还是由tomcat处理，另外
+                                 JSP不是由DispatcherServlet处理（因为web.xml配置的url-pattern为/），而是由tomcat负责编译执行，所以拦截器也不会生效）
+                                 当HandlerMethod 执行完成后会返回View,会被ViewResovler 进行视图解析,解析后调用jsp 对应的.class 文件并运行,最终把运行.class 文件的结果响应给客户端.
+                                 视图解析器只是用来找到对应的jsp文件并调用jsp对应的class文件，jsp的编译由tomcat进行。
+web.xml里 DispatcherServlet 的url-pattern为*.do时，Controller的方法的@RequestMapping里，
+name属性可以不带 .do 后缀（发布项目时自动加上.do后缀），但浏览器访问的url路径，必须以 .do 结尾。
+如果 web.xml里 DispatcherServlet 的url-pattern 配置为 *.do 时，springmvc.xml 里静态资源相关 <mvc:resources> 配置都可以不配置了。
+
+3.2 Filter 可以拦截任何请求（静态资源，图片）.
+3.3 拦截器是SpringMVC的技术,Filter是Servlet里的概念
+4. 实现自定义拦截器的步骤：
+4.1 新建类实现HandlerInterceptor
+    SpringMVC的拦截器功能比较细致，在控制器之后的动作分成两个子方法：postHandle（控制器正常执行完成后，JSP跳转前执行，如果控制器抛异常，该方法不执行）、
+                                                                     afterCompletion（JSP执行之后）
+4.2 在springmvc.xml里配置拦截器：
+    有两种配置方式：
+4.2.1 拦截所有请求：
+	<!-- 拦截器 -->
+	<mvc:interceptors>
+		<bean class="com.bjsxt.interceptor.DemoInterceptor"></bean>
+	</mvc:interceptors>
+4.2.2 拦截指定url：
+	<!-- 拦截器 -->
+	<mvc:interceptors>
+		<mvc:interceptor>
+			<mvc:mapping path="/demo"/>
+			<mvc:mapping path="/demo1"/>
+			<mvc:mapping path="/demo2"/>
+			<bean class="com.bjsxt.interceptor.DemoInterceptor"></bean>
+		</mvc:interceptor>
+	</mvc:interceptors>
+
+Filter的实现步骤：
+定义 DemoFilter 实现 Filter 接口，然后再在web.xml里配置 <filter> 和 <filter-mapping>（参考CharacterEncodingFilter） 。
+（告诉tomcat，在收到请求时调用）。

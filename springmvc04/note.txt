@@ -1,0 +1,13 @@
+最简单的文件下载实现方式：在 springmvc.xml 里加入静态资源配置路径：
+<mvc:resources location="/files/" mapping="/files/**"></mvc:resources>
+然后在 index.jsp 里加入： <a href="files/show.rar">下载</a>
+但如果写的是 <a href="files/a..txt">下载</a> 此时点击链接，将在谷歌浏览器里打开a.txt内容，不下载。
+（浏览器 inline 模式）
+1.访问资源时相应头如果没有设置Content-Disposition,浏览器默认按照inline 值进行处理
+1.1 inline 能显示就显示,不能显示就下载.
+2.实现文件下载功能，只需要修改相应头中 Context-Disposition="attachment;filename=文件名"
+2.1 attachment 下载,以附件形式下载.
+2.2 filename=值就是下载时显示的下载文件名
+
+拷贝apache 的两个Jar包： commons-fileupload-1.3.1.jar 和 commons-io-2.2.jar ，然后可以在Controller里
+调用 FileUtils.readFileToByteArray() 将File对象转换为byte[]。
